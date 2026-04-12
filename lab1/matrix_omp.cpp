@@ -2,6 +2,8 @@
 #include <vector>
 #include <fstream>
 #include <chrono>
+#include <omp.h>
+#include <cstdlib>
 
 using namespace std;
 
@@ -28,14 +30,21 @@ void writeMatrix(const string& filename, const vector<double>& matrix, int N) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        cerr << "Использование: " << argv[0] << " <matA.txt> <matB.txt> <matC_out.txt>\n";
+    // Добавлен 4-й опциональный аргумент для потоков
+    if (argc < 4 || argc > 5) {
+        cerr << "Использование: " << argv[0] << " <matA.txt> <matB.txt> <matC_out.txt> [num_threads]\n";
         return 1;
     }
 
     string fileA = argv[1];
     string fileB = argv[2];
     string fileC = argv[3];
+
+    int num_threads = omp_get_max_threads();
+    if (argc == 5) {
+        num_threads = atoi(argv[4]);
+        omp_set_num_threads(num_threads);
+    }
 
     vector<double> A, B, C;
     int N_A, N_B;
@@ -55,6 +64,8 @@ int main(int argc, char* argv[]) {
 
     auto start_time = chrono::high_resolution_clock::now();
 
+    // Распараллеливаем внешний цикл по строкам матрицы
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < N; ++i) {
         for (int k = 0; k < N; ++k) {
             double r = A[i * N + k];
@@ -70,6 +81,7 @@ int main(int argc, char* argv[]) {
     writeMatrix(fileC, C, N);
 
     cout << "Объем задачи (N): " << N << "\n";
+    cout << "Потоков: " << num_threads << "\n";
     cout << "Время выполнения: " << elapsed.count() << " сек\n";
 
     return 0;
